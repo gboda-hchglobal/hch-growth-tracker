@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "279426418573",
+    "project_id": "hch-growth-tracker-c465a",
+    "storage_bucket": "hch-growth-tracker-c465a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:279426418573:android:0fa0225f4744a5db855fc4",
+        "android_client_info": {
+          "package_name": "com.example.hch_growth_tracker"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "279426418573-q7fckimktk1lpi7j35kei1hftfv7gimm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB9qZoh-sM67N98sTvzX31Vy3Ul7HXK2Ww"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "279426418573-q7fckimktk1lpi7j35kei1hftfv7gimm.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
