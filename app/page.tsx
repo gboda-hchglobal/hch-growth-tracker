@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
-  CircleHelp,
   Download,
   FileText,
   Heart,
@@ -41,6 +40,8 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
+import { onAuthStateChanged, signInWithPopup, signOut as firebaseSignOut } from "firebase/auth";
+import { auth, googleProvider } from "../lib/firebase";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type Metric = "height" | "weight" | "armSpan" | "sittingHeight" | "headCircumference";
@@ -306,7 +307,7 @@ function Logo({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function AuthScreen({ onEnter }: { onEnter: () => void }) {
+function AuthScreen({ onEnter, onGoogleSignIn, authError }: { onEnter: () => void; onGoogleSignIn: () => Promise<void>; authError: string }) {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("sarah@example.com");
   const [password, setPassword] = useState("demo1234");
@@ -384,10 +385,11 @@ function AuthScreen({ onEnter }: { onEnter: () => void }) {
             <p>{mode === "login" ? "Your child’s growth story is waiting." : "Start tracking meaningful milestones today."}</p>
           </div>
 
-          <button className="google-button" type="button" onClick={() => { setLoading(true); window.setTimeout(onEnter, 550); }}>
+          <button className="google-button" type="button" disabled={loading} onClick={async () => { setLoading(true); await onGoogleSignIn(); setLoading(false); }}>
             <span className="google-g">G</span>
             Continue with Google
           </button>
+          {authError && <p className="auth-error" role="alert">{authError}</p>}
 
           <div className="auth-divider"><span>or continue with email</span></div>
 
@@ -491,7 +493,6 @@ function Sidebar({
             );
           })}
           <span className="nav-label secondary">Support</span>
-          <button><CircleHelp size={19} /><span>Guidance</span></button>
           <button className={view === "settings" ? "active" : ""} onClick={() => { setView("settings"); closeMobile(); }}><Settings size={19} /><span>Settings</span></button>
         </nav>
         <div className="sidebar-callout">
@@ -1399,7 +1400,7 @@ function SettingsPage({
 
         <section className="panel settings-card">
           <div className="settings-card-head"><span className="summary-icon purple"><LockKeyhole size={19} /></span><div><h3>Privacy</h3><p>How this prototype handles your information.</p></div></div>
-          <ul className="privacy-list"><li><CheckCircle2 size={16} /> Records are stored locally in this browser.</li><li><CheckCircle2 size={16} /> No Google, Firebase or cloud account is connected yet.</li><li><CheckCircle2 size={16} /> Exported files are saved wherever you choose to download them.</li><li><CheckCircle2 size={16} /> Clear saved data before sharing or leaving a shared device.</li></ul>
+          <ul className="privacy-list"><li><CheckCircle2 size={16} /> Google sign-in is handled by Firebase Authentication.</li><li><CheckCircle2 size={16} /> Records are still stored locally in this browser.</li><li><CheckCircle2 size={16} /> Exported files are saved wherever you choose to download them.</li><li><CheckCircle2 size={16} /> Clear saved data before sharing or leaving a shared device.</li></ul>
         </section>
       </div>
     </div>
@@ -1408,6 +1409,8 @@ function SettingsPage({
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [authError, setAuthError] = useState("");
   const [view, setView] = useState<View>("overview");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [measurementModal, setMeasurementModal] = useState(false);
@@ -1419,14 +1422,16 @@ export default function App() {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setAuthenticated(Boolean(user));
+      setAuthReady(true);
+    });
     try {
       const stored = window.localStorage.getItem("hch-demo-measurements");
-      const auth = window.localStorage.getItem("hch-demo-auth");
       const storedSettings = window.localStorage.getItem("hch-demo-settings");
       const storedProfiles = window.localStorage.getItem("hch-demo-profiles");
       const storedActiveChild = window.localStorage.getItem("hch-demo-active-child");
       if (stored) setMeasurements(JSON.parse(stored));
-      if (auth === "true") setAuthenticated(true);
       if (storedSettings) setSettings({ ...defaultSettings, ...JSON.parse(storedSettings) });
       if (storedProfiles) setProfiles(JSON.parse(storedProfiles));
       if (storedActiveChild) setActiveChildId(storedActiveChild);
@@ -1434,6 +1439,7 @@ export default function App() {
       // Storage is optional; the demo remains usable without it.
     }
     setHydrated(true);
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
@@ -1465,9 +1471,20 @@ export default function App() {
     setAuthenticated(true);
     window.localStorage.setItem("hch-demo-auth", "true");
   };
+  const googleSignIn = async () => {
+    setAuthError("");
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      const code = error instanceof Error && "code" in error ? String((error as { code?: string }).code) : "";
+      if (code === "auth/popup-closed-by-user") return;
+      setAuthError("Google sign-in could not be completed. Check that this site is authorized in Firebase and try again.");
+    }
+  };
   const signOut = () => {
     setAuthenticated(false);
     window.localStorage.removeItem("hch-demo-auth");
+    void firebaseSignOut(auth);
   };
   const addMeasurement = (measurement: Measurement) => {
     setMeasurements((current) => [...current, measurement].sort((a, b) => a.date.localeCompare(b.date)));
@@ -1495,8 +1512,8 @@ export default function App() {
     return <Overview measurements={measurements} onAdd={() => setMeasurementModal(true)} onView={setView} onProfile={() => setProfileModal(true)} settings={settings} />;
   }, [view, measurements, settings]);
 
-  if (!hydrated) return <div className="app-loading"><Logo /><span className="spinner dark" /></div>;
-  if (!authenticated) return <AuthScreen onEnter={enter} />;
+  if (!hydrated || !authReady) return <div className="app-loading"><Logo /><span className="spinner dark" /></div>;
+  if (!authenticated) return <AuthScreen onEnter={enter} onGoogleSignIn={googleSignIn} authError={authError} />;
 
   return (
     <div className="app-shell">
