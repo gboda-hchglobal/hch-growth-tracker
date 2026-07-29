@@ -74,6 +74,14 @@ const defaultSettings: AppSettings = {
   showReferenceLines: true,
 };
 
+const emptySettings: AppSettings = {
+  ...defaultSettings,
+  profileName: "",
+  birthDate: "",
+  sex: "Not specified",
+  diagnosis: "",
+};
+
 const defaultChildProfile: ChildProfile = {
   id: "mia",
   name: "Mia Carter",
@@ -90,7 +98,12 @@ type Measurement = {
   weight?: number;
   armSpan?: number;
   headCircumference?: number;
+  comment?: string;
 };
+
+function userStorageKey(userId: string, name: string) {
+  return `hch-user-${userId}-${name}`;
+}
 
 const metricInfo: Record<
   Metric,
@@ -501,15 +514,16 @@ function Topbar({
   );
 }
 
-function ChildPicker({ onOpen }: { onOpen: () => void }) {
+function ChildPicker({ onOpen, name = "Add a child profile", age = "" }: { onOpen: () => void; name?: string; age?: string }) {
+  const initials = name.trim() ? name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase() : "＋";
   return (
     <button className="child-picker" onClick={onOpen}>
-      <span className="avatar">MC</span>
+      <span className="avatar">{initials}</span>
       <span className="child-picker-copy">
         <small>VIEWING PROFILE</small>
-        <strong>Mia Carter <ChevronDown size={15} /></strong>
+        <strong>{name} <ChevronDown size={15} /></strong>
       </span>
-      <span className="child-age">8 years, 8 months</span>
+      {age && <span className="child-age">{age}</span>}
     </button>
   );
 }
@@ -740,7 +754,7 @@ function ChartPanel({
         <div>
           <span className="eyebrow">HCH growth reference</span>
           <h3>{metricInfo[metric].label} over time</h3>
-          <p>Mia&apos;s measurements shown with a digitised preview of published HCH reference centiles.</p>
+          <p>{settings.profileName ? `${settings.profileName}'s` : "Your child's"} measurements shown with a digitised preview of published HCH reference centiles.</p>
         </div>
         <div className="chart-actions">
           <select value={metric} onChange={(event) => setMetric(event.target.value as Metric)} aria-label="Select measurement">
@@ -750,7 +764,7 @@ function ChartPanel({
         </div>
       </div>
       <div className="legend">
-        <span><i className="legend-line personal" /> Mia&apos;s measurements</span>
+        <span><i className="legend-line personal" /> {settings.profileName ? `${settings.profileName}'s` : "Your child's"} measurements</span>
         <span><i className="legend-line reference" /> HCH 50th centile</span>
         <span><i className="legend-band" /> HCH 2nd–98th range</span>
       </div>
@@ -817,9 +831,9 @@ function Overview({
         <div>
           <span className="eyebrow">Wednesday, 29 July</span>
           <h1>Good morning, Sarah <span>☀</span></h1>
-          <p>Here&apos;s how Mia&apos;s growth story is taking shape.</p>
+          <p>Here&apos;s how {settings.profileName ? `${settings.profileName}'s` : "your child's"} growth story is taking shape.</p>
         </div>
-        <ChildPicker onOpen={onProfile} />
+        <ChildPicker onOpen={onProfile} name={settings.profileName || undefined} />
       </div>
 
       <section className="welcome-strip">
@@ -827,7 +841,7 @@ function Overview({
         <div className="welcome-copy">
           <span className="eyebrow">Next check-in</span>
           <strong>Ready for a new measurement?</strong>
-          <p>It&apos;s been 17 days since Mia&apos;s last entry. Regular measurements make trends easier to see.</p>
+          <p>{measurements.length ? "Regular measurements make trends easier to see." : "Add a first measurement to start seeing a growth trend."}</p>
         </div>
         <button className="primary-button" onClick={onAdd}><Plus size={17} /> Add today&apos;s measurement</button>
         <div className="welcome-pattern" aria-hidden="true" />
@@ -851,7 +865,7 @@ function Overview({
             <div className="insight-orbit"><TrendingUp size={22} /></div>
             <span className="eyebrow">Growth insight</span>
             <h3>A steady path</h3>
-            <p>Mia&apos;s recorded height has followed a consistent trajectory across the last three entries.</p>
+            <p>{settings.profileName ? `${settings.profileName}'s` : "Your child's"} recorded height will appear here as measurements are added.</p>
             <div className="insight-stat">
               <strong>4.3 <small>cm/year</small></strong>
               <span>Average recorded velocity</span>
@@ -860,13 +874,13 @@ function Overview({
           </article>
           <article className="panel profile-card">
             <div className="profile-card-head">
-              <span className="avatar large">MC</span>
-              <div><strong>Mia Carter</strong><span>Female · HCH</span></div>
+              <span className="avatar large">{settings.profileName ? settings.profileName.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase() : "＋"}</span>
+              <div><strong>{settings.profileName || "No child selected"}</strong><span>{settings.sex !== "Not specified" ? settings.sex : "Add profile details"}{settings.diagnosis ? ` · ${settings.diagnosis}` : ""}</span></div>
               <button className="icon-button" onClick={onProfile}><MoreHorizontal size={18} /></button>
             </div>
             <dl>
-              <div><dt>Date of birth</dt><dd>18 Nov 2017</dd></div>
-              <div><dt>Current age</dt><dd>8y 8m</dd></div>
+              <div><dt>Date of birth</dt><dd>{settings.birthDate ? formatDate(settings.birthDate) : "Not added"}</dd></div>
+              <div><dt>Current age</dt><dd>{settings.birthDate ? formatAge((Date.now() - new Date(`${settings.birthDate}T12:00:00`).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : "Not added"}</dd></div>
               <div><dt>Measurements</dt><dd>{measurements.length} entries</dd></div>
             </dl>
             <button className="soft-button full" onClick={onProfile}><UserRound size={16} /> Manage profile</button>
@@ -890,11 +904,13 @@ function MeasurementsPage({
   onAdd,
   onProfile,
   units,
+  profileName,
 }: {
   measurements: Measurement[];
   onAdd: () => void;
   onProfile: () => void;
   units: UnitSystem;
+  profileName: string;
 }) {
   const [filter, setFilter] = useState<"all" | "pastYear" | "height" | "weight">("all");
   const filteredMeasurements = measurements.filter((entry) => {
@@ -911,8 +927,8 @@ function MeasurementsPage({
   return (
     <div className="page">
       <div className="page-intro">
-        <div><span className="eyebrow">Health record</span><h1>Measurements</h1><p>A complete, editable history of Mia&apos;s growth.</p></div>
-        <ChildPicker onOpen={onProfile} />
+        <div><span className="eyebrow">Health record</span><h1>Measurements</h1><p>A complete, editable history of {profileName ? `${profileName}'s` : "your child's"} growth.</p></div>
+        <ChildPicker onOpen={onProfile} name={profileName || undefined} />
       </div>
       <div className="subpage-actions">
         <div className="filter-pills">
@@ -950,8 +966,8 @@ function ChartsPage({ measurements, onProfile, settings }: { measurements: Measu
   return (
     <div className="page">
       <div className="page-intro">
-        <div><span className="eyebrow">Visual trends</span><h1>Growth charts</h1><p>Zoom in, compare and explore Mia&apos;s history over time.</p></div>
-        <ChildPicker onOpen={onProfile} />
+        <div><span className="eyebrow">Visual trends</span><h1>Growth charts</h1><p>Zoom in, compare and explore {settings.profileName ? `${settings.profileName}'s` : "your child's"} history over time.</p></div>
+        <ChildPicker onOpen={onProfile} name={settings.profileName || undefined} />
       </div>
       <section className="chart-kpis">
         <div><span>Tracking period</span><strong>2 years, 10 months</strong></div>
@@ -963,7 +979,7 @@ function ChartsPage({ measurements, onProfile, settings }: { measurements: Measu
       <section className="chart-explainer-grid">
         <article className="panel explain-card">
           <span className="summary-icon coral"><LineChart size={19} /></span>
-          <div><strong>Reading the chart</strong><p>The coral line connects Mia&apos;s measurements. Reference lines provide context for the overall pattern.</p></div>
+          <div><strong>Reading the chart</strong><p>The coral line connects {settings.profileName ? `${settings.profileName}'s` : "your child's"} measurements. Reference lines provide context for the overall pattern.</p></div>
         </article>
         <article className="panel explain-card">
           <span className="summary-icon yellow"><ShieldCheck size={19} /></span>
@@ -977,9 +993,11 @@ function ChartsPage({ measurements, onProfile, settings }: { measurements: Measu
 function ReportsPage({
   measurements,
   onProfile,
+  settings,
 }: {
   measurements: Measurement[];
   onProfile: () => void;
+  settings: AppSettings;
 }) {
   const [creating, setCreating] = useState(false);
   const [done, setDone] = useState(false);
@@ -995,16 +1013,16 @@ function ReportsPage({
     doc.text("HCH Growth Summary", 16, 19);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.text("Prepared for Mia Carter · 29 July 2026", 16, 29);
+    doc.text(`Prepared for ${settings.profileName || "child profile"} · 29 July 2026`, 16, 29);
     doc.setTextColor(31, 52, 54);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(15);
     doc.text("Child profile", 16, 57);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.text("Date of birth: 18 November 2017", 16, 67);
-    doc.text("Diagnosis recorded by parent: Hypochondroplasia (HCH)", 16, 74);
-    doc.text("Tracking period: September 2023 – July 2026", 16, 81);
+    doc.text(`Date of birth: ${settings.birthDate ? formatDate(settings.birthDate, true) : "Not added"}`, 16, 67);
+    doc.text(`Diagnosis recorded by parent: ${settings.diagnosis || "Not added"}`, 16, 74);
+    doc.text(`Tracking period: ${measurements[0] ? formatDate(measurements[0].date) : "No entries"} – ${measurements.at(-1) ? formatDate(measurements.at(-1)!.date) : "No entries"}`, 16, 81);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(15);
     doc.text("Measurement history", 16, 99);
@@ -1039,7 +1057,7 @@ function ReportsPage({
     doc.setTextColor(118, 126, 125);
     doc.setFontSize(8);
     doc.text("Generated by HCH Growth Tracker", 16, 282);
-    doc.save("mia-carter-hch-growth-summary.pdf");
+    doc.save(`${settings.profileName.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "growth"}-hch-growth-summary.pdf`);
     setCreating(false);
     setDone(true);
     window.setTimeout(() => setDone(false), 3000);
@@ -1048,13 +1066,13 @@ function ReportsPage({
     <div className="page">
       <div className="page-intro">
         <div><span className="eyebrow">Shareable summaries</span><h1>Reports</h1><p>Prepare a clear record for appointments and your care team.</p></div>
-        <ChildPicker onOpen={onProfile} />
+        <ChildPicker onOpen={onProfile} name={settings.profileName || undefined} />
       </div>
       <section className="report-hero">
         <div>
           <span className="report-icon"><FileText size={30} /></span>
           <span className="eyebrow light">Appointment summary</span>
-          <h2>Mia&apos;s growth report</h2>
+          <h2>{settings.profileName ? `${settings.profileName}'s` : "Your child's"} growth report</h2>
           <p>A clean PDF with profile details and complete measurement history, ready to save or print.</p>
           <button className="light-button" onClick={exportPdf} disabled={creating}>
             {creating ? <span className="spinner dark" /> : done ? <Check size={17} /> : <Download size={17} />}
@@ -1064,12 +1082,12 @@ function ReportsPage({
         <div className="report-preview">
           <div className="paper">
             <div className="paper-brand"><Logo compact /><span>GROWTH SUMMARY</span></div>
-            <h3>Mia Carter</h3>
-            <p>8 years, 8 months · Female</p>
+            <h3>{settings.profileName || "Child profile"}</h3>
+            <p>{settings.sex !== "Not specified" ? settings.sex : "Add profile details"}</p>
             <div className="paper-rule" />
             <div className="paper-stats">
-              <span><small>HEIGHT</small><strong>109.2 cm</strong></span>
-              <span><small>WEIGHT</small><strong>20.1 kg</strong></span>
+              <span><small>HEIGHT</small><strong>{measurements.at(-1)?.height ?? "—"} cm</strong></span>
+              <span><small>WEIGHT</small><strong>{measurements.at(-1)?.weight ?? "—"} kg</strong></span>
             </div>
             <svg viewBox="0 0 260 72">
               <path d="M3 62 C38 60 48 50 79 50 S127 35 157 34 S203 20 257 10" fill="none" stroke="#e86f51" strokeWidth="3" />
@@ -1107,10 +1125,12 @@ function MeasurementModal({
   open,
   close,
   add,
+  profileName,
 }: {
   open: boolean;
   close: () => void;
   add: (measurement: Measurement) => void;
+  profileName: string;
 }) {
   const [step, setStep] = useState(1);
   const [saved, setSaved] = useState(false);
@@ -1120,6 +1140,7 @@ function MeasurementModal({
     weight: "",
     armSpan: "",
     headCircumference: "",
+    comment: "",
   });
   useEffect(() => {
     if (open) {
@@ -1141,6 +1162,7 @@ function MeasurementModal({
       weight: values.weight ? Number(values.weight) : undefined,
       armSpan: values.armSpan ? Number(values.armSpan) : undefined,
       headCircumference: values.headCircumference ? Number(values.headCircumference) : undefined,
+      comment: values.comment.trim() || undefined,
     });
     setSaved(true);
     window.setTimeout(close, 850);
@@ -1150,7 +1172,7 @@ function MeasurementModal({
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Add measurement">
       <div className="modal measurement-modal">
         <div className="modal-head">
-          <div><span className="eyebrow">Mia Carter</span><h2>Add measurement</h2></div>
+          <div><span className="eyebrow">{profileName || "Child profile"}</span><h2>Add measurement</h2></div>
           <button className="icon-button" onClick={close}><X size={20} /></button>
         </div>
         <div className="modal-progress">
@@ -1159,7 +1181,7 @@ function MeasurementModal({
           <span className={step >= 2 ? "active" : ""}><i>2</i> Review</span>
         </div>
         {saved ? (
-          <div className="success-state"><span><Check size={30} /></span><h3>Measurement saved</h3><p>Mia&apos;s chart has been updated.</p></div>
+          <div className="success-state"><span><Check size={30} /></span><h3>Measurement saved</h3><p>{profileName ? `${profileName}'s` : "Your child's"} chart has been updated.</p></div>
         ) : step === 1 ? (
           <div className="modal-body">
             <label className="field-label">
@@ -1189,6 +1211,10 @@ function MeasurementModal({
                 );
               })}
             </div>
+            <label className="field-label measurement-comment-field">
+              Comment <small className="field-hint">Optional · {values.comment.length}/120</small>
+              <span className="textarea-shell"><textarea maxLength={120} rows={3} value={values.comment} onChange={(event) => setValues({ ...values, comment: event.target.value })} placeholder="e.g. Started growth hormone" /></span>
+            </label>
             <div className="tip-box"><Info size={17} /><p>Only add the values you measured today. You can leave the others blank.</p></div>
           </div>
         ) : (
@@ -1199,6 +1225,7 @@ function MeasurementModal({
                 <div key={metric}><span>{metricInfo[metric].label}</span><strong>{values[metric]} <small>{metricInfo[metric].unit}</small></strong></div>
               ))}
             </div>
+            {values.comment.trim() && <div className="review-comment"><span>Comment</span><strong>{values.comment}</strong></div>}
             {!(Object.keys(metricInfo) as Metric[]).some((metric) => values[metric]) && (
               <div className="empty-review">Go back and add at least one measurement.</div>
             )}
@@ -1289,11 +1316,13 @@ function SettingsPage({
   setSettings,
   measurements,
   setMeasurements,
+  userId,
 }: {
   settings: AppSettings;
   setSettings: (settings: AppSettings) => void;
   measurements: Measurement[];
   setMeasurements: (measurements: Measurement[]) => void;
+  userId: string | null;
 }) {
   const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     setSettings({ ...settings, [key]: value });
@@ -1310,7 +1339,13 @@ function SettingsPage({
   const deleteData = () => {
     if (!window.confirm("Delete all saved measurements and reset profile settings? This cannot be undone.")) return;
     setMeasurements([]);
-    setSettings(defaultSettings);
+    setSettings(emptySettings);
+    if (userId) {
+      window.localStorage.removeItem(userStorageKey(userId, "measurements"));
+      window.localStorage.removeItem(userStorageKey(userId, "settings"));
+      window.localStorage.removeItem(userStorageKey(userId, "profiles"));
+      window.localStorage.removeItem(userStorageKey(userId, "active-child"));
+    }
     window.localStorage.removeItem("hch-demo-measurements");
     window.localStorage.removeItem("hch-demo-settings");
   };
@@ -1357,53 +1392,75 @@ function SettingsPage({
 export default function App() {
   const [authenticated, setAuthenticated] = useState(false);
   const [authReady, setAuthReady] = useState(false);
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [authError, setAuthError] = useState("");
   const [view, setView] = useState<View>("overview");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [measurementModal, setMeasurementModal] = useState(false);
   const [profileModal, setProfileModal] = useState(false);
-  const [measurements, setMeasurements] = useState<Measurement[]>(initialMeasurements);
-  const [settings, setSettings] = useState<AppSettings>(defaultSettings);
-  const [profiles, setProfiles] = useState<ChildProfile[]>([defaultChildProfile]);
-  const [activeChildId, setActiveChildId] = useState("mia");
+  const [measurements, setMeasurements] = useState<Measurement[]>([]);
+  const [settings, setSettings] = useState<AppSettings>(emptySettings);
+  const [profiles, setProfiles] = useState<ChildProfile[]>([]);
+  const [activeChildId, setActiveChildId] = useState("");
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setAuthenticated(Boolean(user));
+      setAuthUserId(user?.uid ?? null);
+      if (user) {
+        const marker = userStorageKey(user.uid, "initialized");
+        const firstLogin = window.localStorage.getItem(marker) !== "true";
+        window.localStorage.setItem(marker, "true");
+        if (firstLogin) {
+          setMeasurements([]);
+          setSettings(emptySettings);
+          setProfiles([]);
+          setActiveChildId("");
+        } else {
+          try {
+            const storedMeasurements = window.localStorage.getItem(userStorageKey(user.uid, "measurements"));
+            const storedSettings = window.localStorage.getItem(userStorageKey(user.uid, "settings"));
+            const storedProfiles = window.localStorage.getItem(userStorageKey(user.uid, "profiles"));
+            const storedActiveChild = window.localStorage.getItem(userStorageKey(user.uid, "active-child"));
+            setMeasurements(storedMeasurements ? JSON.parse(storedMeasurements) : []);
+            setSettings(storedSettings ? { ...emptySettings, ...JSON.parse(storedSettings) } : emptySettings);
+            setProfiles(storedProfiles ? JSON.parse(storedProfiles) : []);
+            setActiveChildId(storedActiveChild ?? "");
+          } catch {
+            setMeasurements([]);
+            setSettings(emptySettings);
+            setProfiles([]);
+            setActiveChildId("");
+          }
+        }
+      } else {
+        setMeasurements([]);
+        setSettings(emptySettings);
+        setProfiles([]);
+        setActiveChildId("");
+      }
       setAuthReady(true);
     });
-    try {
-      const stored = window.localStorage.getItem("hch-demo-measurements");
-      const storedSettings = window.localStorage.getItem("hch-demo-settings");
-      const storedProfiles = window.localStorage.getItem("hch-demo-profiles");
-      const storedActiveChild = window.localStorage.getItem("hch-demo-active-child");
-      if (stored) setMeasurements(JSON.parse(stored));
-      if (storedSettings) setSettings({ ...defaultSettings, ...JSON.parse(storedSettings) });
-      if (storedProfiles) setProfiles(JSON.parse(storedProfiles));
-      if (storedActiveChild) setActiveChildId(storedActiveChild);
-    } catch {
-      // Storage is optional; the demo remains usable without it.
-    }
     setHydrated(true);
     return unsubscribe;
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return;
-    window.localStorage.setItem("hch-demo-measurements", JSON.stringify(measurements));
-  }, [measurements, hydrated]);
+    if (!hydrated || !authReady || !authUserId) return;
+    window.localStorage.setItem(userStorageKey(authUserId, "measurements"), JSON.stringify(measurements));
+  }, [measurements, hydrated, authReady, authUserId]);
 
   useEffect(() => {
-    if (!hydrated) return;
-    window.localStorage.setItem("hch-demo-settings", JSON.stringify(settings));
-  }, [settings, hydrated]);
+    if (!hydrated || !authReady || !authUserId) return;
+    window.localStorage.setItem(userStorageKey(authUserId, "settings"), JSON.stringify(settings));
+  }, [settings, hydrated, authReady, authUserId]);
 
   useEffect(() => {
-    if (!hydrated) return;
-    window.localStorage.setItem("hch-demo-profiles", JSON.stringify(profiles));
-    window.localStorage.setItem("hch-demo-active-child", activeChildId);
-  }, [profiles, activeChildId, hydrated]);
+    if (!hydrated || !authReady || !authUserId) return;
+    window.localStorage.setItem(userStorageKey(authUserId, "profiles"), JSON.stringify(profiles));
+    window.localStorage.setItem(userStorageKey(authUserId, "active-child"), activeChildId);
+  }, [profiles, activeChildId, hydrated, authReady, authUserId]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -1416,6 +1473,11 @@ export default function App() {
 
   const enter = () => {
     setAuthenticated(true);
+    setAuthUserId("demo-user");
+    setMeasurements([]);
+    setSettings(emptySettings);
+    setProfiles([]);
+    setActiveChildId("");
     window.localStorage.setItem("hch-demo-auth", "true");
   };
   const googleSignIn = async () => {
@@ -1430,6 +1492,7 @@ export default function App() {
   };
   const signOut = () => {
     setAuthenticated(false);
+    setAuthUserId(null);
     window.localStorage.removeItem("hch-demo-auth");
     void firebaseSignOut(auth);
   };
@@ -1438,24 +1501,24 @@ export default function App() {
   };
   const selectChild = (id: string) => {
     if (id === activeChildId) return;
-    window.localStorage.setItem(`hch-demo-measurements-${activeChildId}`, JSON.stringify(measurements));
+    if (authUserId && activeChildId) window.localStorage.setItem(userStorageKey(authUserId, `measurements-${activeChildId}`), JSON.stringify(measurements));
     const nextProfile = profiles.find((profile) => profile.id === id);
-    const storedNext = window.localStorage.getItem(`hch-demo-measurements-${id}`);
+    const storedNext = authUserId ? window.localStorage.getItem(userStorageKey(authUserId, `measurements-${id}`)) : null;
     setActiveChildId(id);
-    setMeasurements(storedNext ? JSON.parse(storedNext) : id === "mia" ? initialMeasurements : []);
+    setMeasurements(storedNext ? JSON.parse(storedNext) : []);
     if (nextProfile) setSettings((current) => ({ ...current, profileName: nextProfile.name, birthDate: nextProfile.birthDate, sex: nextProfile.sex, diagnosis: nextProfile.diagnosis }));
   };
   const addChild = (profile: Omit<ChildProfile, "id">) => {
     if (profiles.length >= 3) return;
     const id = `child-${Date.now()}`;
     setProfiles((current) => [...current, { id, ...profile }]);
-    window.localStorage.setItem(`hch-demo-measurements-${id}`, JSON.stringify([]));
+    if (authUserId) window.localStorage.setItem(userStorageKey(authUserId, `measurements-${id}`), JSON.stringify([]));
   };
   const content = useMemo(() => {
-    if (view === "measurements") return <MeasurementsPage measurements={measurements} onAdd={() => setMeasurementModal(true)} onProfile={() => setProfileModal(true)} units={settings.units} />;
+    if (view === "measurements") return <MeasurementsPage measurements={measurements} onAdd={() => setMeasurementModal(true)} onProfile={() => setProfileModal(true)} units={settings.units} profileName={settings.profileName} />;
     if (view === "charts") return <ChartsPage measurements={measurements} onProfile={() => setProfileModal(true)} settings={settings} />;
-    if (view === "reports") return <ReportsPage measurements={measurements} onProfile={() => setProfileModal(true)} />;
-    if (view === "settings") return <SettingsPage settings={settings} setSettings={setSettings} measurements={measurements} setMeasurements={setMeasurements} />;
+    if (view === "reports") return <ReportsPage measurements={measurements} onProfile={() => setProfileModal(true)} settings={settings} />;
+    if (view === "settings") return <SettingsPage settings={settings} setSettings={setSettings} measurements={measurements} setMeasurements={setMeasurements} userId={authUserId} />;
     return <Overview measurements={measurements} onAdd={() => setMeasurementModal(true)} onView={setView} onProfile={() => setProfileModal(true)} settings={settings} />;
   }, [view, measurements, settings]);
 
@@ -1473,7 +1536,7 @@ export default function App() {
           <a href="https://www.ncbi.nlm.nih.gov/books/NBK1477/" target="_blank" rel="noreferrer">Clinical reference: GeneReviews <ArrowRight size={13} /></a>
         </footer>
       </div>
-      <MeasurementModal open={measurementModal} close={() => setMeasurementModal(false)} add={addMeasurement} />
+      <MeasurementModal open={measurementModal} close={() => setMeasurementModal(false)} add={addMeasurement} profileName={settings.profileName} />
       <ProfileModal open={profileModal} close={() => setProfileModal(false)} profiles={profiles} activeId={activeChildId} onSelect={selectChild} onAdd={addChild} />
     </div>
   );

@@ -2307,6 +2307,42 @@ h3,
   gap: 16px;
 }
 
+.measurement-comment-field {
+  margin-top: 17px;
+}
+
+.field-hint,
+.character-count {
+  margin-left: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.textarea-shell {
+  display: block;
+}
+
+.textarea-shell textarea {
+  width: 100%;
+  min-height: 72px;
+  padding: 11px 13px;
+  resize: vertical;
+  color: var(--ink);
+  border: 1px solid #dce1de;
+  border-radius: 10px;
+  background: white;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.textarea-shell textarea:focus {
+  outline: none;
+  border-color: #ef9b85;
+  box-shadow: 0 0 0 3px rgba(232, 111, 81, 0.1);
+}
+
 .tip-box {
   margin-top: 20px;
   padding: 12px;
@@ -2397,6 +2433,28 @@ h3,
 .review-grid small {
   color: var(--muted);
   font-size: 9px;
+}
+
+.review-comment {
+  margin-top: 12px;
+  padding: 12px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: white;
+}
+
+.review-comment span {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.review-comment strong {
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .empty-review {
