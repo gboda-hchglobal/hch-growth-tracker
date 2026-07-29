@@ -42,7 +42,7 @@ import { onAuthStateChanged, signInWithPopup, signOut as firebaseSignOut } from 
 import { auth, googleProvider } from "../lib/firebase";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
-type Metric = "height" | "weight" | "armSpan" | "sittingHeight" | "headCircumference";
+type Metric = "height" | "weight" | "armSpan" | "headCircumference";
 type View = "overview" | "measurements" | "charts" | "reports" | "settings";
 type UnitSystem = "metric" | "imperial";
 
@@ -89,7 +89,6 @@ type Measurement = {
   height?: number;
   weight?: number;
   armSpan?: number;
-  sittingHeight?: number;
   headCircumference?: number;
 };
 
@@ -100,13 +99,6 @@ const metricInfo: Record<
   height: { label: "Height", unit: "cm", short: "Height", color: "#e86f51", icon: Ruler },
   weight: { label: "Weight", unit: "kg", short: "Weight", color: "#345f63", icon: Scale },
   armSpan: { label: "Arm span", unit: "cm", short: "Arm span", color: "#dfa827", icon: ArrowLeft },
-  sittingHeight: {
-    label: "Sitting height",
-    unit: "cm",
-    short: "Sitting",
-    color: "#7b6da9",
-    icon: UserRound,
-  },
   headCircumference: {
     label: "Head circumference",
     unit: "cm",
@@ -126,7 +118,7 @@ function convertValue(metric: Metric, value: number, units: UnitSystem) {
   return metric === "weight" ? value * 2.2046226218 : value / 2.54;
 }
 
-const referenceMetrics: Metric[] = ["height", "sittingHeight", "weight", "headCircumference"];
+const referenceMetrics: Metric[] = ["height", "weight", "headCircumference"];
 
 const measurementGuides: Record<Metric, {
   title: string;
@@ -138,7 +130,7 @@ const measurementGuides: Record<Metric, {
   height: {
     title: "How to measure standing height",
     intro: "For children with disproportionate short stature, use the same equipment and positioning each time so the trend is comparable.",
-    image: "/instructions/height-sitting-weight-guide.png",
+    image: "/instructions/height-weight-guide.png",
     steps: [
       "Use a stadiometer or wall-mounted tape with a head plate. Remove shoes and hair items that interfere.",
       "Place feet about shoulder-width apart, with heels against the vertical surface. Aim for heels, buttocks, shoulder blades and head to touch; head and buttocks are the minimum if all four are not possible.",
@@ -147,22 +139,10 @@ const measurementGuides: Record<Metric, {
     ],
     source: "Adapted from BioMarin, Anthropometric measurements guide in disproportionate short stature (MED-SC-0183, October 2025).",
   },
-  sittingHeight: {
-    title: "How to measure sitting height",
-    intro: "Sitting height helps the specialist team understand body proportions. Support the child comfortably and record the support setup.",
-    image: "/instructions/height-sitting-weight-guide.png",
-    steps: [
-      "Use a stadiometer or wall-mounted tape, a firm stool and foot support. Set the hips and knees to about 90°; use firm blocks or books to support the feet if needed.",
-      "Keep the buttocks, shoulders and back of the head against the vertical surface when possible. Keep the Frankfurt plane horizontal and the child looking straight ahead.",
-      "Lower the head plate gently to the crown and measure to the nearest 0.1 cm. Record the stool and any sitting-block heights separately.",
-      "Reposition the child before repeating. Use the same stool, supports and technique at follow-up visits.",
-    ],
-    source: "Adapted from BioMarin, Anthropometric measurements guide in disproportionate short stature (MED-SC-0183, October 2025).",
-  },
   weight: {
     title: "How to measure weight",
     intro: "Weight is most useful when it is measured consistently and interpreted alongside the child’s other growth measures.",
-    image: "/instructions/height-sitting-weight-guide.png",
+    image: "/instructions/height-weight-guide.png",
     steps: [
       "Use a calibrated, clinic-approved electronic scale on a firm, level surface. Check that it is zeroed before weighing.",
       "Remove shoes and heavy clothing. Follow your clinic’s instructions for clothing, and use the same approach each time.",
@@ -186,7 +166,7 @@ const measurementGuides: Record<Metric, {
   armSpan: {
     title: "How to measure arm span",
     intro: "Arm span is not currently shown as a published reference chart in this app.",
-    image: "/instructions/height-sitting-weight-guide.png",
+    image: "/instructions/height-weight-guide.png",
     steps: ["Ask the specialist team to demonstrate the preferred standing or supine technique and recording method."],
     source: "See the BioMarin anthropometric measurements guide for arm-span methods.",
   },
@@ -200,7 +180,6 @@ const initialMeasurements: Measurement[] = [
     height: 96.4,
     weight: 16.1,
     armSpan: 90.8,
-    sittingHeight: 56.2,
     headCircumference: 52.1,
   },
   {
@@ -210,7 +189,6 @@ const initialMeasurements: Measurement[] = [
     height: 98.9,
     weight: 16.8,
     armSpan: 93.2,
-    sittingHeight: 57.4,
     headCircumference: 52.4,
   },
   {
@@ -220,7 +198,6 @@ const initialMeasurements: Measurement[] = [
     height: 101.8,
     weight: 17.7,
     armSpan: 95.9,
-    sittingHeight: 58.9,
     headCircumference: 52.7,
   },
   {
@@ -230,7 +207,6 @@ const initialMeasurements: Measurement[] = [
     height: 104.1,
     weight: 18.4,
     armSpan: 98.1,
-    sittingHeight: 60.1,
     headCircumference: 52.9,
   },
   {
@@ -240,7 +216,6 @@ const initialMeasurements: Measurement[] = [
     height: 106.3,
     weight: 19.2,
     armSpan: 100.2,
-    sittingHeight: 61.2,
     headCircumference: 53.2,
   },
   {
@@ -250,7 +225,6 @@ const initialMeasurements: Measurement[] = [
     height: 109.2,
     weight: 20.1,
     armSpan: 103.1,
-    sittingHeight: 62.8,
     headCircumference: 53.4,
   },
 ];
@@ -611,11 +585,6 @@ function GrowthChart({
       max: 128,
       reference: [[78, 88, 96], [84, 94, 103], [90, 101, 111], [96, 108, 119], [101, 115, 126], [106, 121, 133]],
     },
-    sittingHeight: {
-      min: 46,
-      max: 76,
-      reference: [[47, 52, 57], [50, 55, 61], [53, 59, 65], [56, 62, 69], [58, 65, 72], [60, 68, 75]],
-    },
     headCircumference: {
       min: 48,
       max: 60,
@@ -971,6 +940,13 @@ function MeasurementsPage({
 }
 
 function ChartsPage({ measurements, onProfile, settings }: { measurements: Measurement[]; onProfile: () => void; settings: AppSettings }) {
+  const latest = measurements.at(-1);
+  const previous = measurements.at(-2) ?? latest;
+  const change = (metric: Metric) => {
+    if (typeof latest?.[metric] !== "number" || typeof previous?.[metric] !== "number") return "—";
+    const delta = convertValue(metric, latest[metric] as number, settings.units) - convertValue(metric, previous[metric] as number, settings.units);
+    return `${delta >= 0 ? "+" : ""}${delta.toFixed(1)} ${unitLabel(metric, settings.units)}`;
+  };
   return (
     <div className="page">
       <div className="page-intro">
@@ -979,8 +955,9 @@ function ChartsPage({ measurements, onProfile, settings }: { measurements: Measu
       </div>
       <section className="chart-kpis">
         <div><span>Tracking period</span><strong>2 years, 10 months</strong></div>
-        <div><span>Recorded height change</span><strong>+12.8 cm</strong></div>
-        <div><span>Latest recorded velocity</span><strong>4.3 cm/year</strong></div>
+        <div><span>Height change</span><strong>{change("height")}</strong></div>
+        <div><span>Weight change</span><strong>{change("weight")}</strong></div>
+        <div><span>Head circumference change</span><strong>{change("headCircumference")}</strong></div>
       </section>
       <ChartPanel measurements={measurements} settings={settings} expanded />
       <section className="chart-explainer-grid">
@@ -1142,7 +1119,6 @@ function MeasurementModal({
     height: "",
     weight: "",
     armSpan: "",
-    sittingHeight: "",
     headCircumference: "",
   });
   useEffect(() => {
@@ -1164,7 +1140,6 @@ function MeasurementModal({
       height: values.height ? Number(values.height) : undefined,
       weight: values.weight ? Number(values.weight) : undefined,
       armSpan: values.armSpan ? Number(values.armSpan) : undefined,
-      sittingHeight: values.sittingHeight ? Number(values.sittingHeight) : undefined,
       headCircumference: values.headCircumference ? Number(values.headCircumference) : undefined,
     });
     setSaved(true);
