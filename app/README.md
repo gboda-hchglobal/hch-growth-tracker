@@ -1,17 +1,39 @@
-# hch_growth_tracker
+# HCH Growth Tracker
 
-A new Flutter project.
+Flutter application for tracking growth data for children with
+hypochondroplasia (HCH).
 
-## Getting Started
+## Currently working
 
-This project is a starting point for a Flutter application.
+- Starts as a Flutter application on the configured platform.
+- Initializes Firebase at startup using platform-specific options.
+- Displays the `HCH Growth Tracker` application title and app bar.
+- Displays a Firebase connection confirmation after initialization.
+- Includes the Flutter Material UI foundation and Cupertino Icons dependency.
 
-A few resources to get you started if this is your first Flutter project:
+## Not implemented yet
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+The following features are specified for the project but are not currently
+implemented:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- User authentication
+- Child profiles
+- Growth measurements
+- Growth chart visualization
+- Firestore data persistence
+- PDF report export
+
+## Development
+
+From the `app` directory:
+
+```bash
+flutter pub get
+flutter run
+```
+
+Run the test suite with:
+
+```bash
+flutter test
+```
