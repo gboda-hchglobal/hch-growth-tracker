@@ -44,7 +44,44 @@ import {
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type Metric = "height" | "weight" | "armSpan" | "sittingHeight" | "headCircumference";
-type View = "overview" | "measurements" | "charts" | "reports";
+type View = "overview" | "measurements" | "charts" | "reports" | "settings";
+type UnitSystem = "metric" | "imperial";
+
+type AppSettings = {
+  profileName: string;
+  birthDate: string;
+  sex: string;
+  diagnosis: string;
+  units: UnitSystem;
+  showReferenceBands: boolean;
+  showReferenceLines: boolean;
+};
+
+type ChildProfile = {
+  id: string;
+  name: string;
+  birthDate: string;
+  sex: string;
+  diagnosis: string;
+};
+
+const defaultSettings: AppSettings = {
+  profileName: "Mia Carter",
+  birthDate: "2017-11-18",
+  sex: "Female",
+  diagnosis: "Hypochondroplasia (HCH)",
+  units: "metric",
+  showReferenceBands: true,
+  showReferenceLines: true,
+};
+
+const defaultChildProfile: ChildProfile = {
+  id: "mia",
+  name: "Mia Carter",
+  birthDate: "2017-11-18",
+  sex: "Female",
+  diagnosis: "Hypochondroplasia (HCH)",
+};
 
 type Measurement = {
   id: number;
@@ -80,7 +117,81 @@ const metricInfo: Record<
   },
 };
 
-const referenceMetrics: Metric[] = ["height", "weight", "headCircumference"];
+function unitLabel(metric: Metric, units: UnitSystem) {
+  if (units === "metric") return metric === "weight" ? "kg" : "cm";
+  return metric === "weight" ? "lb" : "in";
+}
+
+function convertValue(metric: Metric, value: number, units: UnitSystem) {
+  if (units === "metric") return value;
+  return metric === "weight" ? value * 2.2046226218 : value / 2.54;
+}
+
+const referenceMetrics: Metric[] = ["height", "sittingHeight", "weight", "headCircumference"];
+
+const measurementGuides: Record<Metric, {
+  title: string;
+  intro: string;
+  image: string;
+  steps: string[];
+  source: string;
+}> = {
+  height: {
+    title: "How to measure standing height",
+    intro: "For children with disproportionate short stature, use the same equipment and positioning each time so the trend is comparable.",
+    image: "/instructions/height-sitting-weight-guide.png",
+    steps: [
+      "Use a stadiometer or wall-mounted tape with a head plate. Remove shoes and hair items that interfere.",
+      "Place feet about shoulder-width apart, with heels against the vertical surface. Aim for heels, buttocks, shoulder blades and head to touch; head and buttocks are the minimum if all four are not possible.",
+      "Keep the Frankfurt plane horizontal and lower the head plate gently to the crown. Record to the nearest 0.1 cm.",
+      "Reposition the child and repeat the measurement. Keep the same breathing routine each time; young children usually do best without breathing instructions.",
+    ],
+    source: "Adapted from BioMarin, Anthropometric measurements guide in disproportionate short stature (MED-SC-0183, October 2025).",
+  },
+  sittingHeight: {
+    title: "How to measure sitting height",
+    intro: "Sitting height helps the specialist team understand body proportions. Support the child comfortably and record the support setup.",
+    image: "/instructions/height-sitting-weight-guide.png",
+    steps: [
+      "Use a stadiometer or wall-mounted tape, a firm stool and foot support. Set the hips and knees to about 90°; use firm blocks or books to support the feet if needed.",
+      "Keep the buttocks, shoulders and back of the head against the vertical surface when possible. Keep the Frankfurt plane horizontal and the child looking straight ahead.",
+      "Lower the head plate gently to the crown and measure to the nearest 0.1 cm. Record the stool and any sitting-block heights separately.",
+      "Reposition the child before repeating. Use the same stool, supports and technique at follow-up visits.",
+    ],
+    source: "Adapted from BioMarin, Anthropometric measurements guide in disproportionate short stature (MED-SC-0183, October 2025).",
+  },
+  weight: {
+    title: "How to measure weight",
+    intro: "Weight is most useful when it is measured consistently and interpreted alongside the child’s other growth measures.",
+    image: "/instructions/height-sitting-weight-guide.png",
+    steps: [
+      "Use a calibrated, clinic-approved electronic scale on a firm, level surface. Check that it is zeroed before weighing.",
+      "Remove shoes and heavy clothing. Follow your clinic’s instructions for clothing, and use the same approach each time.",
+      "Have the child stand centered on the scale, balanced and still, with arms relaxed at the sides. Stay close for safety without touching the child.",
+      "Record the scale’s displayed value and measurement date. Repeat if the reading is unexpected or the child moved.",
+    ],
+    source: "Technique summarized from RCPCH UK-WHO growth-chart guidance; ask the child’s clinical team which scale and clothing standard to use.",
+  },
+  headCircumference: {
+    title: "How to measure head circumference",
+    intro: "Use a flexible, non-stretch tape and measure the largest occipitofrontal circumference—not around the ears.",
+    image: "/instructions/head-circumference-guide.png",
+    steps: [
+      "Seat the child on a caregiver’s lap, looking straight ahead. An active child may need one person to gently stabilize the head while another measures.",
+      "Remove hair accessories, braids or anything that changes the tape path. Place the tape above the eyebrows and ears and around the most prominent back of the head.",
+      "Move the tape up and down to find the largest circumference. Pull it taut to minimize hair, but do not include the ears or compress the skin.",
+      "Reposition and repeat the measurement. Record the value to the nearest 0.1 cm.",
+    ],
+    source: "Adapted from BioMarin, Anthropometric measurements guide in disproportionate short stature (MED-SC-0183, October 2025).",
+  },
+  armSpan: {
+    title: "How to measure arm span",
+    intro: "Arm span is not currently shown as a published reference chart in this app.",
+    image: "/instructions/height-sitting-weight-guide.png",
+    steps: ["Ask the specialist team to demonstrate the preferred standing or supine technique and recording method."],
+    source: "See the BioMarin anthropometric measurements guide for arm-span methods.",
+  },
+};
 
 const initialMeasurements: Measurement[] = [
   {
@@ -381,7 +492,7 @@ function Sidebar({
           })}
           <span className="nav-label secondary">Support</span>
           <button><CircleHelp size={19} /><span>Guidance</span></button>
-          <button><Settings size={19} /><span>Settings</span></button>
+          <button className={view === "settings" ? "active" : ""} onClick={() => { setView("settings"); closeMobile(); }}><Settings size={19} /><span>Settings</span></button>
         </nav>
         <div className="sidebar-callout">
           <span className="callout-icon"><Sparkles size={17} /></span>
@@ -406,6 +517,19 @@ function Topbar({
   onMenu: () => void;
   onAdd: () => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const [read, setRead] = useState(false);
+  const notifications = [
+    { title: "Measurement check-in", body: "It’s a good time to record Mia’s next growth measurements.", time: "Today" },
+    { title: "Appointment summary ready", body: "Your latest measurements can be exported from Reports.", time: "This week" },
+  ];
+  const markRead = () => {
+    setRead(true);
+    window.localStorage.setItem("hch-demo-notifications-read", "true");
+  };
+  useEffect(() => {
+    setRead(window.localStorage.getItem("hch-demo-notifications-read") === "true");
+  }, []);
   return (
     <header className="topbar">
       <button className="mobile-menu icon-button" onClick={onMenu}><Menu size={21} /></button>
@@ -416,7 +540,14 @@ function Topbar({
       </div>
       <div className="top-actions">
         <span className="sync-state"><CheckCircle2 size={15} /> All changes saved</span>
-        <button className="icon-button notification" title="Notifications"><Bell size={19} /><i /></button>
+        <div className="notification-wrap">
+          <button className="icon-button notification" title="Notifications" aria-label="Notifications" aria-expanded={open} onClick={() => setOpen((current) => !current)}><Bell size={19} />{!read && <i />}</button>
+          {open && <div className="notification-panel" role="dialog" aria-label="Notifications">
+            <div className="notification-head"><div><span className="eyebrow">Family reminders</span><h3>Notifications</h3></div><button className="link-button" onClick={markRead}>Mark all read</button></div>
+            <div className="notification-list">{notifications.map((notification) => <article key={notification.title} className={`notification-item ${read ? "read" : ""}`}><span className="notification-dot" /><div><strong>{notification.title}</strong><p>{notification.body}</p><small>{notification.time}</small></div></article>)}</div>
+            <p className="notification-foot"><Info size={14} /> Reminders are stored locally in this browser.</p>
+          </div>}
+        </div>
         <button className="top-add" onClick={onAdd}><Plus size={17} /> <span>Add measurement</span></button>
       </div>
     </header>
@@ -470,12 +601,18 @@ function GrowthChart({
   measurements,
   zoom,
   setZoom,
+  units = "metric",
+  showReferenceBands = true,
+  showReferenceLines = true,
   compact = false,
 }: {
   metric: Metric;
   measurements: Measurement[];
   zoom: number;
   setZoom: (zoom: number) => void;
+  units?: UnitSystem;
+  showReferenceBands?: boolean;
+  showReferenceLines?: boolean;
   compact?: boolean;
 }) {
   const info = metricInfo[metric];
@@ -484,7 +621,7 @@ function GrowthChart({
     : { width: 920, height: 380, left: 64, right: 26, top: 26, bottom: 48 };
   const values = measurements
     .filter((entry) => typeof entry[metric] === "number")
-    .map((entry) => ({ x: entry.age, y: entry[metric] as number, date: entry.date }));
+    .map((entry) => ({ x: entry.age, y: convertValue(metric, entry[metric] as number, units), date: entry.date }));
   const metricRanges: Record<Metric, { min: number; max: number; reference: [number, number, number][] }> = {
     height: {
       min: 76,
@@ -512,7 +649,12 @@ function GrowthChart({
       reference: [[49, 52, 55], [49.8, 53, 56.2], [50.4, 54, 57], [50.8, 54.7, 57.7], [51.2, 55.3, 58.3], [51.5, 55.7, 58.7]],
     },
   };
-  const range = metricRanges[metric];
+  const baseRange = metricRanges[metric];
+  const range = {
+    min: convertValue(metric, baseRange.min, units),
+    max: convertValue(metric, baseRange.max, units),
+    reference: baseRange.reference.map((row) => row.map((value) => convertValue(metric, value, units))) as [number, number, number][],
+  };
   const xMin = zoom === 1 ? 4 : zoom === 2 ? 5 : 6;
   const xMax = zoom === 1 ? 14 : zoom === 2 ? 12 : 10;
   const yMin = range.min;
@@ -555,23 +697,16 @@ function GrowthChart({
             <text x={x(tick)} y={dims.height - 17} textAnchor="middle" className="axis-label">{tick} yrs</text>
           </g>
         ))}
-        <text x="15" y="15" className="axis-unit">{info.unit}</text>
+        <text x="15" y="15" className="axis-unit">{unitLabel(metric, units)}</text>
         <path
           d={`${path(percentiles[2])} ${percentiles[0].slice().reverse().map((point) => `L${x(point.x).toFixed(1)},${y(point.y).toFixed(1)}`).join(" ")} Z`}
           fill="#f2c65d"
           opacity=".11"
         />
-        {percentiles.map((points, index) => (
-          <path
-            key={index}
-            d={path(points)}
-            fill="none"
-            stroke={index === 1 ? "#c9a03f" : "#d7c38e"}
-            strokeWidth={index === 1 ? 2 : 1.4}
-            strokeDasharray={index === 1 ? "0" : "7 7"}
-          />
+        {showReferenceLines && percentiles.map((points, index) => (
+          <path key={index} d={path(points)} fill="none" stroke={index === 1 ? "#c9a03f" : "#d7c38e"} strokeWidth={index === 1 ? 2 : 1.4} strokeDasharray={index === 1 ? "0" : "7 7"} />
         ))}
-        {visibleValues.length > 1 && (
+        {showReferenceBands && visibleValues.length > 1 && (
           <path
             d={`${path(visibleValues)} L${x(visibleValues[visibleValues.length - 1].x)},${dims.height - dims.bottom} L${x(visibleValues[0].x)},${dims.height - dims.bottom} Z`}
             fill={`url(#plotFill-${metric})`}
@@ -589,13 +724,15 @@ function GrowthChart({
           return (
             <g transform={`translate(${Math.min(x(point.x) + 13, dims.width - 135)},${Math.max(y(point.y) - 36, 9)})`}>
               <rect width="113" height="33" rx="9" fill="#183f42" />
-              <text x="12" y="21" fill="white" fontSize="12" fontWeight="700">{point.y} {info.unit} · Latest</text>
+              <text x="12" y="21" fill="white" fontSize="12" fontWeight="700">{point.y.toFixed(1)} {unitLabel(metric, units)} · Latest</text>
             </g>
           );
         })()}
-        <text x={dims.width - 51} y={y(percentiles[2][Math.min(percentiles[2].length - 1, 3)].y) - 8} className="centile-label">98th</text>
-        <text x={dims.width - 51} y={y(percentiles[1][Math.min(percentiles[1].length - 1, 3)].y) - 8} className="centile-label">50th</text>
-        <text x={dims.width - 51} y={y(percentiles[0][Math.min(percentiles[0].length - 1, 3)].y) - 8} className="centile-label">2nd</text>
+        {showReferenceLines && <>
+          <text x={dims.width - 51} y={y(percentiles[2][Math.min(percentiles[2].length - 1, 3)].y) - 8} className="centile-label">98th</text>
+          <text x={dims.width - 51} y={y(percentiles[1][Math.min(percentiles[1].length - 1, 3)].y) - 8} className="centile-label">50th</text>
+          <text x={dims.width - 51} y={y(percentiles[0][Math.min(percentiles[0].length - 1, 3)].y) - 8} className="centile-label">2nd</text>
+        </>}
       </svg>
       {!compact && (
         <div className="chart-controls">
@@ -608,13 +745,49 @@ function GrowthChart({
   );
 }
 
+function MeasurementGuide({ metric }: { metric: Metric }) {
+  const guide = measurementGuides[metric];
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <section className="measurement-guide" aria-labelledby={`guide-${metric}`}>
+      <div className="measurement-guide-copy">
+        <span className="eyebrow">Measurement guide</span>
+        <h4 id={`guide-${metric}`}>{guide.title}</h4>
+        <p className="measurement-guide-intro">{guide.intro}</p>
+        <ol>
+          {guide.steps.map((step) => <li key={step}>{step}</li>)}
+        </ol>
+        <p className="measurement-guide-source">
+          <strong>Source:</strong> {guide.source}{" "}
+          <a href="https://medical.biomarin.com/en-us/wp-content/uploads/sites/2/2025/10/Anthropometric-measurements-guide_MED-SC-0183_OCT2025.pdf?v=1.20" target="_blank" rel="noreferrer">Open the BioMarin guide</a>
+        </p>
+      </div>
+      <figure className="measurement-guide-figure">
+        <button className="measurement-guide-image-button" onClick={() => setExpanded(true)} aria-label={`Enlarge ${metricInfo[metric].label.toLowerCase()} instructions`}>
+          <img src={guide.image} alt={`Illustrated instructions for ${metricInfo[metric].label.toLowerCase()}`} />
+          <span><ZoomIn size={15} /> Click to enlarge</span>
+        </button>
+        <figcaption>Illustration for orientation only. Follow your clinic’s equipment and safety instructions.</figcaption>
+      </figure>
+      {expanded && <div className="image-lightbox" role="dialog" aria-modal="true" aria-label={`Enlarged ${metricInfo[metric].label.toLowerCase()} instructions`} onClick={() => setExpanded(false)}>
+        <div className="image-lightbox-inner" onClick={(event) => event.stopPropagation()}>
+          <button className="icon-button image-lightbox-close" onClick={() => setExpanded(false)} aria-label="Close enlarged image"><X size={20} /></button>
+          <img src={guide.image} alt={`Enlarged illustrated instructions for ${metricInfo[metric].label.toLowerCase()}`} />
+        </div>
+      </div>}
+    </section>
+  );
+}
+
 function ChartPanel({
   measurements,
   initialMetric = "height",
+  settings = defaultSettings,
   expanded = false,
 }: {
   measurements: Measurement[];
   initialMetric?: Metric;
+  settings?: AppSettings;
   expanded?: boolean;
 }) {
   const [metric, setMetric] = useState<Metric>(initialMetric);
@@ -639,7 +812,8 @@ function ChartPanel({
         <span><i className="legend-line reference" /> HCH 50th centile</span>
         <span><i className="legend-band" /> HCH 2nd–98th range</span>
       </div>
-      <GrowthChart metric={metric} measurements={measurements} zoom={zoom} setZoom={setZoom} />
+      <GrowthChart metric={metric} measurements={measurements} zoom={zoom} setZoom={setZoom} units={settings.units} showReferenceBands={settings.showReferenceBands} showReferenceLines={settings.showReferenceLines} />
+      <MeasurementGuide metric={metric} />
       <div className="clinical-note">
         <Info size={16} />
         <p>
@@ -652,7 +826,7 @@ function ChartPanel({
   );
 }
 
-function MeasurementRows({ measurements, limit }: { measurements: Measurement[]; limit?: number }) {
+function MeasurementRows({ measurements, limit, units = "metric" }: { measurements: Measurement[]; limit?: number; units?: UnitSystem }) {
   const rows = measurements.slice().reverse().slice(0, limit ?? measurements.length);
   return (
     <div className="measurement-table-wrap">
@@ -668,9 +842,9 @@ function MeasurementRows({ measurements, limit }: { measurements: Measurement[];
                 <strong>{formatDate(entry.date)}</strong>
               </td>
               <td>{formatAge(entry.age)}</td>
-              <td>{entry.height ?? "—"} <small>cm</small></td>
-              <td>{entry.weight ?? "—"} <small>kg</small></td>
-              <td>{entry.headCircumference ?? "—"} <small>cm</small></td>
+              <td>{typeof entry.height === "number" ? convertValue("height", entry.height, units).toFixed(1) : "—"} <small>{unitLabel("height", units)}</small></td>
+              <td>{typeof entry.weight === "number" ? convertValue("weight", entry.weight, units).toFixed(1) : "—"} <small>{unitLabel("weight", units)}</small></td>
+              <td>{typeof entry.headCircumference === "number" ? convertValue("headCircumference", entry.headCircumference, units).toFixed(1) : "—"} <small>{unitLabel("headCircumference", units)}</small></td>
               <td><button className="icon-button"><MoreHorizontal size={17} /></button></td>
             </tr>
           ))}
@@ -685,14 +859,16 @@ function Overview({
   onAdd,
   onView,
   onProfile,
+  settings,
 }: {
   measurements: Measurement[];
   onAdd: () => void;
   onView: (view: View) => void;
   onProfile: () => void;
+  settings: AppSettings;
 }) {
-  const latest = measurements[measurements.length - 1];
-  const previous = measurements[measurements.length - 2];
+  const latest = measurements[measurements.length - 1] ?? { date: new Date().toISOString().slice(0, 10), age: 0 };
+  const previous = measurements[measurements.length - 2] ?? latest;
   return (
     <div className="page overview-page">
       <div className="page-intro">
@@ -727,7 +903,7 @@ function Overview({
       </section>
 
       <section className="dashboard-grid">
-        <ChartPanel measurements={measurements} />
+        <ChartPanel measurements={measurements} settings={settings} />
         <aside className="right-column">
           <article className="panel insight-panel">
             <div className="insight-orbit"><TrendingUp size={22} /></div>
@@ -761,7 +937,7 @@ function Overview({
           <div><span className="eyebrow">History</span><h3>Recent measurements</h3></div>
           <button className="ghost-button" onClick={() => onView("measurements")}>View all <ChevronRight size={15} /></button>
         </div>
-        <MeasurementRows measurements={measurements} limit={3} />
+        <MeasurementRows measurements={measurements} limit={3} units={settings.units} />
       </section>
     </div>
   );
@@ -771,11 +947,25 @@ function MeasurementsPage({
   measurements,
   onAdd,
   onProfile,
+  units,
 }: {
   measurements: Measurement[];
   onAdd: () => void;
   onProfile: () => void;
+  units: UnitSystem;
 }) {
+  const [filter, setFilter] = useState<"all" | "pastYear" | "height" | "weight">("all");
+  const filteredMeasurements = measurements.filter((entry) => {
+    if (filter === "height") return typeof entry.height === "number";
+    if (filter === "weight") return typeof entry.weight === "number";
+    if (filter === "pastYear") {
+      const latestDate = measurements.at(-1)?.date ?? new Date().toISOString().slice(0, 10);
+      const cutoff = new Date(`${latestDate}T12:00:00`);
+      cutoff.setFullYear(cutoff.getFullYear() - 1);
+      return new Date(`${entry.date}T12:00:00`) >= cutoff;
+    }
+    return true;
+  });
   return (
     <div className="page">
       <div className="page-intro">
@@ -784,16 +974,16 @@ function MeasurementsPage({
       </div>
       <div className="subpage-actions">
         <div className="filter-pills">
-          <button className="active">All entries</button>
-          <button>Past year</button>
-          <button>Height</button>
-          <button>Weight</button>
+          <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>All entries</button>
+          <button className={filter === "pastYear" ? "active" : ""} onClick={() => setFilter("pastYear")}>Past year</button>
+          <button className={filter === "height" ? "active" : ""} onClick={() => setFilter("height")}>Height</button>
+          <button className={filter === "weight" ? "active" : ""} onClick={() => setFilter("weight")}>Weight</button>
         </div>
         <button className="primary-button" onClick={onAdd}><Plus size={17} /> Add measurement</button>
       </div>
       <section className="measurement-summary">
         <div><span className="summary-icon coral"><Ruler size={20} /></span><p>Latest height<strong>{measurements.at(-1)?.height} cm</strong></p></div>
-        <div><span className="summary-icon teal"><History size={20} /></span><p>Tracking since<strong>{formatDate(measurements[0].date)}</strong></p></div>
+        <div><span className="summary-icon teal"><History size={20} /></span><p>Tracking since<strong>{measurements[0] ? formatDate(measurements[0].date) : "No entries yet"}</strong></p></div>
         <div><span className="summary-icon yellow"><Activity size={20} /></span><p>Total entries<strong>{measurements.length} measurements</strong></p></div>
       </section>
       <section className="panel full-table-panel">
@@ -801,13 +991,13 @@ function MeasurementsPage({
           <div><span className="eyebrow">All records</span><h3>Growth history</h3></div>
           <button className="ghost-button"><Download size={15} /> Export CSV</button>
         </div>
-        <MeasurementRows measurements={measurements} />
+        <MeasurementRows measurements={filteredMeasurements} units={units} />
       </section>
     </div>
   );
 }
 
-function ChartsPage({ measurements, onProfile }: { measurements: Measurement[]; onProfile: () => void }) {
+function ChartsPage({ measurements, onProfile, settings }: { measurements: Measurement[]; onProfile: () => void; settings: AppSettings }) {
   return (
     <div className="page">
       <div className="page-intro">
@@ -819,7 +1009,7 @@ function ChartsPage({ measurements, onProfile }: { measurements: Measurement[]; 
         <div><span>Recorded height change</span><strong>+12.8 cm</strong></div>
         <div><span>Latest recorded velocity</span><strong>4.3 cm/year</strong></div>
       </section>
-      <ChartPanel measurements={measurements} expanded />
+      <ChartPanel measurements={measurements} settings={settings} expanded />
       <section className="chart-explainer-grid">
         <article className="panel explain-card">
           <span className="summary-icon coral"><LineChart size={19} /></span>
@@ -1086,8 +1276,31 @@ function MeasurementModal({
   );
 }
 
-function ProfileModal({ open, close }: { open: boolean; close: () => void }) {
+function ProfileModal({
+  open,
+  close,
+  profiles,
+  activeId,
+  onSelect,
+  onAdd,
+}: {
+  open: boolean;
+  close: () => void;
+  profiles: ChildProfile[];
+  activeId: string;
+  onSelect: (id: string) => void;
+  onAdd: (profile: Omit<ChildProfile, "id">) => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState({ name: "", birthDate: "", sex: "Not specified", diagnosis: "" });
   if (!open) return null;
+  const saveNewProfile = (event: FormEvent) => {
+    event.preventDefault();
+    if (!draft.name.trim() || !draft.birthDate) return;
+    onAdd({ ...draft, name: draft.name.trim(), diagnosis: draft.diagnosis.trim() || "Not specified" });
+    setDraft({ name: "", birthDate: "", sex: "Not specified", diagnosis: "" });
+    setAdding(false);
+  };
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Child profiles">
       <div className="modal profile-modal">
@@ -1095,13 +1308,99 @@ function ProfileModal({ open, close }: { open: boolean; close: () => void }) {
           <div><span className="eyebrow">Family</span><h2>Child profiles</h2></div>
           <button className="icon-button" onClick={close}><X size={20} /></button>
         </div>
-        <div className="profile-choice selected">
-          <span className="avatar large">MC</span>
-          <div><strong>Mia Carter</strong><span>8 years, 8 months · Female</span><small>Hypochondroplasia (HCH)</small></div>
-          <span className="selected-check"><Check size={15} /></span>
+        <div className="profile-list">
+          {profiles.map((profile) => (
+            <button key={profile.id} className={`profile-choice ${profile.id === activeId ? "selected" : ""}`} onClick={() => { onSelect(profile.id); close(); }}>
+              <span className="avatar large">{profile.name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</span>
+              <div><strong>{profile.name}</strong><span>{profile.id === "mia" ? "8 years, 8 months" : "Family profile"} · {profile.sex}</span><small>{profile.diagnosis}</small></div>
+              {profile.id === activeId && <span className="selected-check"><Check size={15} /></span>}
+            </button>
+          ))}
         </div>
-        <button className="add-profile"><span><Plus size={19} /></span><div><strong>Add another child</strong><small>Create a separate, private growth record</small></div><ChevronRight size={18} /></button>
+        {adding ? (
+          <form className="add-profile-form" onSubmit={saveNewProfile}>
+            <div className="settings-form-grid">
+              <label>Child&apos;s name<input autoFocus required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
+              <label>Birth date<input required type="date" value={draft.birthDate} onChange={(event) => setDraft({ ...draft, birthDate: event.target.value })} /></label>
+              <label>Sex<select value={draft.sex} onChange={(event) => setDraft({ ...draft, sex: event.target.value })}><option>Female</option><option>Male</option><option>Not specified</option></select></label>
+              <label>Diagnosis or condition<input value={draft.diagnosis} onChange={(event) => setDraft({ ...draft, diagnosis: event.target.value })} /></label>
+            </div>
+            <div className="settings-actions"><button className="primary-button" type="submit">Add child</button><button className="ghost-button" type="button" onClick={() => setAdding(false)}>Cancel</button></div>
+          </form>
+        ) : (
+          <button className="add-profile" disabled={profiles.length >= 3} onClick={() => setAdding(true)}><span><Plus size={19} /></span><div><strong>{profiles.length >= 3 ? "Family limit reached" : "Add another child"}</strong><small>{profiles.length >= 3 ? "Up to 3 children per family" : "Create a separate, private growth record"}</small></div><ChevronRight size={18} /></button>
+        )}
         <div className="profile-privacy"><ShieldCheck size={18} /><p>Each child&apos;s record is kept separate. You control what gets exported or shared.</p></div>
+      </div>
+    </div>
+  );
+}
+
+function SettingsPage({
+  settings,
+  setSettings,
+  measurements,
+  setMeasurements,
+}: {
+  settings: AppSettings;
+  setSettings: (settings: AppSettings) => void;
+  measurements: Measurement[];
+  setMeasurements: (measurements: Measurement[]) => void;
+}) {
+  const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
+    setSettings({ ...settings, [key]: value });
+  };
+  const exportData = () => {
+    const blob = new Blob([JSON.stringify({ profile: settings, measurements }, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${settings.profileName.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "growth-record"}-data.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  const deleteData = () => {
+    if (!window.confirm("Delete all saved measurements and reset profile settings? This cannot be undone.")) return;
+    setMeasurements([]);
+    setSettings(defaultSettings);
+    window.localStorage.removeItem("hch-demo-measurements");
+    window.localStorage.removeItem("hch-demo-settings");
+  };
+
+  return (
+    <div className="page settings-page">
+      <div className="page-intro">
+        <div><span className="eyebrow">Your preferences</span><h1>Settings</h1><p>Keep the record personal, consistent and under your control.</p></div>
+      </div>
+      <div className="settings-grid">
+        <section className="panel settings-card">
+          <div className="settings-card-head"><span className="summary-icon coral"><UserRound size={19} /></span><div><h3>Profile details</h3><p>Used on charts and exported reports.</p></div></div>
+          <div className="settings-form-grid">
+            <label>Child&apos;s name<input value={settings.profileName} onChange={(event) => update("profileName", event.target.value)} /></label>
+            <label>Birth date<input type="date" value={settings.birthDate} onChange={(event) => update("birthDate", event.target.value)} /></label>
+            <label>Sex for reference charts<select value={settings.sex} onChange={(event) => update("sex", event.target.value)}><option>Female</option><option>Male</option><option>Not specified</option></select></label>
+            <label>Diagnosis or condition<input value={settings.diagnosis} onChange={(event) => update("diagnosis", event.target.value)} /></label>
+          </div>
+        </section>
+
+        <section className="panel settings-card">
+          <div className="settings-card-head"><span className="summary-icon yellow"><Ruler size={19} /></span><div><h3>Units & chart references</h3><p>Choose how measurements and reference context are shown.</p></div></div>
+          <label className="settings-select-label">Measurement units<select value={settings.units} onChange={(event) => update("units", event.target.value as UnitSystem)}><option value="metric">Metric — cm and kg</option><option value="imperial">Imperial — inches and pounds</option></select></label>
+          <label className="settings-toggle"><input type="checkbox" checked={settings.showReferenceBands} onChange={(event) => update("showReferenceBands", event.target.checked)} /><span><strong>Show reference range</strong><small>Display the HCH 2nd–98th centile band.</small></span></label>
+          <label className="settings-toggle"><input type="checkbox" checked={settings.showReferenceLines} onChange={(event) => update("showReferenceLines", event.target.checked)} /><span><strong>Show reference centiles</strong><small>Display the HCH 2nd, 50th and 98th lines.</small></span></label>
+          <p className="settings-note"><Info size={15} /> Reference curves are HCH-specific and should be interpreted by the child&apos;s specialist team.</p>
+        </section>
+
+        <section className="panel settings-card">
+          <div className="settings-card-head"><span className="summary-icon teal"><Download size={19} /></span><div><h3>Your data</h3><p>Export a copy or remove the browser-stored demo record.</p></div></div>
+          <div className="settings-actions"><button className="ghost-button" onClick={exportData}><Download size={15} /> Export all data</button><button className="danger-button" onClick={deleteData}>Delete saved data</button></div>
+          <p className="settings-note"><Info size={15} /> Export includes profile settings and all recorded measurements as JSON.</p>
+        </section>
+
+        <section className="panel settings-card">
+          <div className="settings-card-head"><span className="summary-icon purple"><LockKeyhole size={19} /></span><div><h3>Privacy</h3><p>How this prototype handles your information.</p></div></div>
+          <ul className="privacy-list"><li><CheckCircle2 size={16} /> Records are stored locally in this browser.</li><li><CheckCircle2 size={16} /> No Google, Firebase or cloud account is connected yet.</li><li><CheckCircle2 size={16} /> Exported files are saved wherever you choose to download them.</li><li><CheckCircle2 size={16} /> Clear saved data before sharing or leaving a shared device.</li></ul>
+        </section>
       </div>
     </div>
   );
@@ -1114,14 +1413,23 @@ export default function App() {
   const [measurementModal, setMeasurementModal] = useState(false);
   const [profileModal, setProfileModal] = useState(false);
   const [measurements, setMeasurements] = useState<Measurement[]>(initialMeasurements);
+  const [settings, setSettings] = useState<AppSettings>(defaultSettings);
+  const [profiles, setProfiles] = useState<ChildProfile[]>([defaultChildProfile]);
+  const [activeChildId, setActiveChildId] = useState("mia");
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem("hch-demo-measurements");
       const auth = window.localStorage.getItem("hch-demo-auth");
+      const storedSettings = window.localStorage.getItem("hch-demo-settings");
+      const storedProfiles = window.localStorage.getItem("hch-demo-profiles");
+      const storedActiveChild = window.localStorage.getItem("hch-demo-active-child");
       if (stored) setMeasurements(JSON.parse(stored));
       if (auth === "true") setAuthenticated(true);
+      if (storedSettings) setSettings({ ...defaultSettings, ...JSON.parse(storedSettings) });
+      if (storedProfiles) setProfiles(JSON.parse(storedProfiles));
+      if (storedActiveChild) setActiveChildId(storedActiveChild);
     } catch {
       // Storage is optional; the demo remains usable without it.
     }
@@ -1132,6 +1440,26 @@ export default function App() {
     if (!hydrated) return;
     window.localStorage.setItem("hch-demo-measurements", JSON.stringify(measurements));
   }, [measurements, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    window.localStorage.setItem("hch-demo-settings", JSON.stringify(settings));
+  }, [settings, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    window.localStorage.setItem("hch-demo-profiles", JSON.stringify(profiles));
+    window.localStorage.setItem("hch-demo-active-child", activeChildId);
+  }, [profiles, activeChildId, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const active = profiles.find((profile) => profile.id === activeChildId);
+    if (!active) return;
+    setProfiles((current) => current.map((profile) => profile.id === activeChildId
+      ? { ...profile, name: settings.profileName, birthDate: settings.birthDate, sex: settings.sex, diagnosis: settings.diagnosis }
+      : profile));
+  }, [settings.profileName, settings.birthDate, settings.sex, settings.diagnosis, hydrated]);
 
   const enter = () => {
     setAuthenticated(true);
@@ -1144,12 +1472,28 @@ export default function App() {
   const addMeasurement = (measurement: Measurement) => {
     setMeasurements((current) => [...current, measurement].sort((a, b) => a.date.localeCompare(b.date)));
   };
+  const selectChild = (id: string) => {
+    if (id === activeChildId) return;
+    window.localStorage.setItem(`hch-demo-measurements-${activeChildId}`, JSON.stringify(measurements));
+    const nextProfile = profiles.find((profile) => profile.id === id);
+    const storedNext = window.localStorage.getItem(`hch-demo-measurements-${id}`);
+    setActiveChildId(id);
+    setMeasurements(storedNext ? JSON.parse(storedNext) : id === "mia" ? initialMeasurements : []);
+    if (nextProfile) setSettings((current) => ({ ...current, profileName: nextProfile.name, birthDate: nextProfile.birthDate, sex: nextProfile.sex, diagnosis: nextProfile.diagnosis }));
+  };
+  const addChild = (profile: Omit<ChildProfile, "id">) => {
+    if (profiles.length >= 3) return;
+    const id = `child-${Date.now()}`;
+    setProfiles((current) => [...current, { id, ...profile }]);
+    window.localStorage.setItem(`hch-demo-measurements-${id}`, JSON.stringify([]));
+  };
   const content = useMemo(() => {
-    if (view === "measurements") return <MeasurementsPage measurements={measurements} onAdd={() => setMeasurementModal(true)} onProfile={() => setProfileModal(true)} />;
-    if (view === "charts") return <ChartsPage measurements={measurements} onProfile={() => setProfileModal(true)} />;
+    if (view === "measurements") return <MeasurementsPage measurements={measurements} onAdd={() => setMeasurementModal(true)} onProfile={() => setProfileModal(true)} units={settings.units} />;
+    if (view === "charts") return <ChartsPage measurements={measurements} onProfile={() => setProfileModal(true)} settings={settings} />;
     if (view === "reports") return <ReportsPage measurements={measurements} onProfile={() => setProfileModal(true)} />;
-    return <Overview measurements={measurements} onAdd={() => setMeasurementModal(true)} onView={setView} onProfile={() => setProfileModal(true)} />;
-  }, [view, measurements]);
+    if (view === "settings") return <SettingsPage settings={settings} setSettings={setSettings} measurements={measurements} setMeasurements={setMeasurements} />;
+    return <Overview measurements={measurements} onAdd={() => setMeasurementModal(true)} onView={setView} onProfile={() => setProfileModal(true)} settings={settings} />;
+  }, [view, measurements, settings]);
 
   if (!hydrated) return <div className="app-loading"><Logo /><span className="spinner dark" /></div>;
   if (!authenticated) return <AuthScreen onEnter={enter} />;
@@ -1166,7 +1510,7 @@ export default function App() {
         </footer>
       </div>
       <MeasurementModal open={measurementModal} close={() => setMeasurementModal(false)} add={addMeasurement} />
-      <ProfileModal open={profileModal} close={() => setProfileModal(false)} />
+      <ProfileModal open={profileModal} close={() => setProfileModal(false)} profiles={profiles} activeId={activeChildId} onSelect={selectChild} onAdd={addChild} />
     </div>
   );
 }
