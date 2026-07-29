@@ -7,7 +7,6 @@ import {
   ArrowRight,
   Baby,
   BarChart3,
-  Bell,
   CalendarDays,
   Check,
   CheckCircle2,
@@ -28,7 +27,6 @@ import {
   Plus,
   Ruler,
   Scale,
-  Search,
   Settings,
   ShieldCheck,
   Sparkles,
@@ -518,37 +516,11 @@ function Topbar({
   onMenu: () => void;
   onAdd: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [read, setRead] = useState(false);
-  const notifications = [
-    { title: "Measurement check-in", body: "It’s a good time to record Mia’s next growth measurements.", time: "Today" },
-    { title: "Appointment summary ready", body: "Your latest measurements can be exported from Reports.", time: "This week" },
-  ];
-  const markRead = () => {
-    setRead(true);
-    window.localStorage.setItem("hch-demo-notifications-read", "true");
-  };
-  useEffect(() => {
-    setRead(window.localStorage.getItem("hch-demo-notifications-read") === "true");
-  }, []);
   return (
     <header className="topbar">
       <button className="mobile-menu icon-button" onClick={onMenu}><Menu size={21} /></button>
-      <div className="top-search">
-        <Search size={17} />
-        <input aria-label="Search" placeholder="Search measurements..." />
-        <kbd>⌘ K</kbd>
-      </div>
       <div className="top-actions">
         <span className="sync-state"><CheckCircle2 size={15} /> All changes saved</span>
-        <div className="notification-wrap">
-          <button className="icon-button notification" title="Notifications" aria-label="Notifications" aria-expanded={open} onClick={() => setOpen((current) => !current)}><Bell size={19} />{!read && <i />}</button>
-          {open && <div className="notification-panel" role="dialog" aria-label="Notifications">
-            <div className="notification-head"><div><span className="eyebrow">Family reminders</span><h3>Notifications</h3></div><button className="link-button" onClick={markRead}>Mark all read</button></div>
-            <div className="notification-list">{notifications.map((notification) => <article key={notification.title} className={`notification-item ${read ? "read" : ""}`}><span className="notification-dot" /><div><strong>{notification.title}</strong><p>{notification.body}</p><small>{notification.time}</small></div></article>)}</div>
-            <p className="notification-foot"><Info size={14} /> Reminders are stored locally in this browser.</p>
-          </div>}
-        </div>
         <button className="top-add" onClick={onAdd}><Plus size={17} /> <span>Add measurement</span></button>
       </div>
     </header>

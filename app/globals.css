@@ -849,16 +849,6 @@ h3,
   font-size: 12px;
 }
 
-.top-search kbd {
-  padding: 3px 6px;
-  border: 1px solid #dedfd9;
-  border-radius: 5px;
-  color: #a3aaa8;
-  background: white;
-  font-family: inherit;
-  font-size: 9px;
-}
-
 .top-actions {
   display: flex;
   align-items: center;
